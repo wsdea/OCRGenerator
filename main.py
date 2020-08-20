@@ -1,19 +1,10 @@
 import numpy as np
 import os
 import random
+import cv2
 
-#from fontTools.ttLib import TTFont
 from nltk.corpus import words
 from PIL import Image, ImageFont, ImageDraw
-
-#def get_font_character_set(font_name):
-#    with TTFont(os.path.join(FONT_DIR, font_name)) as ttf:
-#        chars = []
-#        for x in ttf["cmap"].tables:
-#            chars += [chr(y[0]) for y in x.cmap.items()]
-#
-#    chars = list(set(chars))
-#    return chars
 
 class PDFGenerator:
     def __init__(self):
@@ -21,9 +12,9 @@ class PDFGenerator:
 
         self.A4 = 29.7/21
         self.size = 1000
-        self.N_BOXES = 100
+        self.N_BOXES = 20
         self.MAX_WORDS_PER_BOX = 10
-        self.FONT_SIZE_EXTREMA = [18, 25]
+        self.FONT_SIZE_RANGE = [18, 25]
 
         excluded_fonts = [
                           'marlett.ttf',
@@ -49,9 +40,9 @@ class PDFGenerator:
         im = PDFImage((int(self.size * self.A4), self.size),
                       background='random')
 
-        for i in range(self.N_BOXES):
+        for _ in range(self.N_BOXES):
             font_name = random.choice(self.all_fonts)
-            font_size = random.randint(*self.FONT_SIZE_EXTREMA)
+            font_size = random.randint(*self.FONT_SIZE_RANGE)
             font = ImageFont.truetype(font_name, font_size)
 
             n_words = random.randint(1, self.MAX_WORDS_PER_BOX)
@@ -61,12 +52,6 @@ class PDFGenerator:
             if not success:
                 break
 
-        print(im.box_list)
-        array = np.array(im.img)
-        for b in im.box_list:
-            array = b.show_borders(array)
-
-        im.img = Image.fromarray(array)
         return im
 
 
@@ -83,7 +68,7 @@ class PDFImage:
         self.background = np.array(background, dtype=np.float32)
         self.min_color_difference = min_color_difference
         self.shape = shape
-        self.img = (self.background + np.zeros((shape[0], shape[1], 3))).astype(np.uint8)
+        self.array = (self.background + np.zeros((shape[0], shape[1], 3))).astype(np.uint8)
         self.box_list = []
         self.free_ys = [True] * self.shape[0]
         self.max_overlap = max_overlap
@@ -112,7 +97,7 @@ class PDFImage:
 
         y_candidates = [y for y in np.where(self.free_ys)[0]
                             if sum(self.free_ys[y:y + box.shape[0]]) >= box.shape[0] - self.max_overlap
-                            and y < max_y]#starting values
+                            and y < max_y] #starting values
 
         if len(y_candidates) == 0:
             print('No more y space')
@@ -120,7 +105,7 @@ class PDFImage:
 
         y = random.choice(y_candidates)
 
-        self.img = box.add_to_image(self.img, x, y)
+        self.array = box.add_to_image(self.array, x, y)
 
         self.box_list.append(box)
 
@@ -128,23 +113,36 @@ class PDFImage:
 
         return True
 
-    def save(self, *args, **kwargs):
-        self.img.save(*args, **kwargs)
+    def save_img(self, show_borders=False, file_name="img.png"):
+        if not file_name.endswith('.png'):
+            file_name += file_name + '.png'
+
+        if show_borders:
+            array = self.array.copy()
+            for b in self.box_list:
+                array = b.show_borders(array)
+
+            cv2.imwrite(file_name, array)
+        else:
+            cv2.imwrite(file_name, self.array)
 
 
 class TextBox:
     def __init__(self, text, font, color, background_color):
         self.text = text
         self.background = np.array(background_color, dtype=np.float32)
+        if np.sum(np.abs(self.background - color)) == 0:
+            raise Exception('Text color is the same as background color')
 
         text_size = font.getsize(text) #in pixel (width, height)
-        self.array = (self.background + np.zeros((text_size[1], text_size[0], 3))).astype(np.uint8)
+        self.array = (self.background
+                      + np.zeros((text_size[1], text_size[0], 3))).astype(np.float32)
 
-        img = Image.fromarray(self.array)
+        img = Image.fromarray(self.array.astype(np.uint8))
         drawer = ImageDraw.Draw(img)
         drawer.text((0, 0), text, color, font=font)
 
-        self.array = np.array(img)
+        self.array = np.array(img, dtype = np.float32)
         self.shape = self.array.shape
 
         self.crop_box_to_image() #here u, d, l, and r will be changed
@@ -186,29 +184,33 @@ class TextBox:
 
     def add_to_image(self, img, x, y):
         self.left = x
-        self.right = x + self.shape[1] #excluded
+        self.right = x + self.shape[1] - 1 #included
         self.up = y
-        self.down  = y + self.shape[0] #excluded
+        self.down  = y + self.shape[0] - 1 #included
 
         mask = self.array != self.background
-        img_crop = img[self.up: self.down, self.left: self.right]
-        blended_box = np.where(mask, self.array, img_crop)
+        img_crop = img[self.up: self.down + 1, self.left: self.right + 1]
+        blended_box = np.where(mask, self.array.astype(np.uint8), img_crop)
 
-        img[self.up: self.down, self.left: self.right] = blended_box
+        img[self.up: self.down + 1, self.left: self.right + 1] = blended_box
 
         return img
 
     def show_borders(self, img):
-        img[self.up      , self.left: self.right] //= 2
-        img[self.down - 1, self.left: self.right] //= 2
-        img[self.up: self.down, self.left]      //= 2
-        img[self.up: self.down, self.right - 1] //= 2
+        img[self.up  , self.left: self.right + 1] //= 2
+        img[self.down, self.left: self.right + 1] //= 2
+        img[self.up: self.down + 1, self.left]  //= 2
+        img[self.up: self.down + 1, self.right] //= 2
         return img
 
-G = PDFGenerator()
-im = G.generate_new_image()
+if __name__ == '__main__':
+    G = PDFGenerator()
+    im = G.generate_new_image()
 
-im.save('img.png')
+    print(im.box_list)
+
+    im.save_img(True , 'example_borders.png')
+    im.save_img(False, 'example.png')
 
 
 
