@@ -43,19 +43,19 @@ class TextBox:
 
     def fit_to_text(self):
         #upper crop
-        while np.sum(np.abs(self.array[0] - self.background)) == 0:
+        while np.sum(np.abs(self.array[0] - self.background)) < 1.:
             self.array = self.array[1:]
 
         #lower crop
-        while np.sum(np.abs(self.array[-1] - self.background)) == 0:
+        while np.sum(np.abs(self.array[-1] - self.background)) < 1.:
             self.array = self.array[:-1]
 
         #left crop
-        while np.sum(np.abs(self.array[:, 0] - self.background)) == 0:
+        while np.sum(np.abs(self.array[:, 0] - self.background)) < 1.:
             self.array = self.array[:, 1:]
 
         #right crop
-        while np.sum(np.abs(self.array[:, -1] - self.background)) == 0:
+        while np.sum(np.abs(self.array[:, -1] - self.background)) < 1.:
             self.array = self.array[:, :-1]
 
 

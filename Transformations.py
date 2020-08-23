@@ -54,31 +54,50 @@ class RandomizedPipeline(DefaultTransformation):
         return array
 
 
+class CoinFlip(DefaultTransformation):
+    def __init__(self, transformation, true_probability=0.5):
+        self.p = true_probability
+        self.transformation = transformation
+
+    def apply(self, array, background):
+        if random.random() < self.p:
+            array = self.transformation.apply(array, background)
+
+        return array
+
+
 class FitToText(DefaultTransformation):
     def __init__(self):
         pass
 
     def apply(self, array, background):
-        print(array)
         #upper crop
-        while np.sum(np.abs(array[0] - background)) == 0:
+        while np.sum(np.abs(array[0] - background)) < 1.:
             array = array[1:]
 
         #lower crop
-        while np.sum(np.abs(array[-1] - background)) == 0:
+        while np.sum(np.abs(array[-1] - background)) < 1.:
             array = array[:-1]
 
         #left crop
-        while np.sum(np.abs(array[:, 0] - background)) == 0:
+        while np.sum(np.abs(array[:, 0] - background)) < 1.:
             array = array[:, 1:]
 
         #right crop
-        while np.sum(np.abs(array[:, -1] - background)) == 0:
+        while np.sum(np.abs(array[:, -1] - background)) < 1.:
             array = array[:, :-1]
 
-        print(array)
-        raise
+        return array
 
+
+class GaussianNoise(DefaultTransformation):
+    def __init__(self, sigma):
+        self.sigma = sigma / np.sqrt(255.)
+
+    def apply(self, array, background):
+        noise = 255 * np.random.normal(0., self.sigma, size=array.shape)
+        array = np.where(np.abs(array - background) >= 1, array + noise, array)
+        array = array.clip(0, 255)
         return array
 
 
@@ -105,7 +124,6 @@ class _GaussianBlurUnfit(DefaultTransformation):
 
 
 def GaussianBlur(sigma, truncate=4.0):
-    print('yo256841')
     return Pipeline([_GaussianBlurUnfit(sigma, truncate),
                      FitToText()])
 

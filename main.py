@@ -6,7 +6,7 @@ from nltk.corpus import words
 from PIL import ImageFont
 
 from PDFImage import PDFImage
-from Transformations import Pipeline, GaussianBlur
+from Transformations import *
 
 class PDFGenerator:
     def __init__(self):
@@ -39,7 +39,8 @@ class PDFGenerator:
         self.vocab = words.words()
 
     def generate_new_image(self):
-        pipeline = Pipeline([GaussianBlur(2)])
+#        pipeline = Pipeline([CoinFlip(GaussianBlur(2))])
+        pipeline = Pipeline([GaussianNoise(1)])
 
         im = PDFImage((int(self.size * self.A4), self.size),
                       pipeline=pipeline,
