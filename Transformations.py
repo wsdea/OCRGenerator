@@ -69,6 +69,20 @@ def GaussianBlur(sigma, truncate=4.0):
     return Pipeline([_GaussianBlurUnfit(sigma, truncate),
                      FitToText()])
 
+class RandomHoles(DefaultTransformation):
+    def __init__(self, hole_probability):
+        self.p = hole_probability
+
+    def apply(self, array, background):
+        h, w, c = array.shape
+        mask = np.random.random((h, w)) < self.p
+        for i in range(c):
+            # array = np.where(np.random.random((h, w)) < self.p, 
+            #                  0, 
+            #                  array)
+            array[mask, i] = background[i]
+        return array
+        
 #Single transformation modification
 class CoinFlip(DefaultTransformation):
     def __init__(self, transformation, true_probability=0.5):

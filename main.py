@@ -68,8 +68,9 @@ class PDFGenerator:
 
 
 if __name__ == '__main__':
-    pipeline = ChoseAny([GaussianBlur(2), GaussianNoise(1)])
-    # pipeline = Pipeline([GaussianNoise(1)])
+    # pipeline = ChoseAny([GaussianBlur(2), GaussianNoise(1), RandomHoles])
+    # pipeline = Pipeline([RandomHoles(0.1)])
+    pipeline = Pipeline([])
     G = PDFGenerator(pipeline)
     im = G.generate_new_image()
 

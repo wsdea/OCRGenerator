@@ -11,7 +11,8 @@ class PDFImage:
                  shape,
                  pipeline: Pipeline,
                  background=(255, 255, 255),
-                 max_overlap=7,
+                #  max_overlap=7,
+                 max_overlap=0,
                  min_color_difference=100,
                  ):
 
