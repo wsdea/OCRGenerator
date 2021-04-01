@@ -9,7 +9,7 @@ from PDFImage import PDFImage
 from Transformations import *
 
 class PDFGenerator:
-    def __init__(self):
+    def __init__(self, pipeline):
         self.FONT_DIR = r'C:\Windows\Fonts'
 
         self.A4 = 29.7/21
@@ -38,12 +38,12 @@ class PDFGenerator:
 
         self.vocab = words.words()
 
+        self.pipeline = pipeline
+
     def generate_new_image(self):
-#        pipeline = Pipeline([CoinFlip(GaussianBlur(2))])
-        pipeline = Pipeline([GaussianNoise(1)])
 
         im = PDFImage((int(self.size * self.A4), self.size),
-                      pipeline=pipeline,
+                      pipeline=self.pipeline,
                       background=(255,255,255))
 #                      background='random')
 
@@ -68,7 +68,9 @@ class PDFGenerator:
 
 
 if __name__ == '__main__':
-    G = PDFGenerator()
+    pipeline = ChoseAny([GaussianBlur(2), GaussianNoise(1)])
+    # pipeline = Pipeline([GaussianNoise(1)])
+    G = PDFGenerator(pipeline)
     im = G.generate_new_image()
 
     print(im.box_list)
