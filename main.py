@@ -55,11 +55,11 @@ class PDFGenerator:
             n_words = random.randint(1, self.MAX_WORDS_PER_BOX)
             text = " ".join(np.random.choice(self.vocab, n_words))
 
-            success = im.add_text_anywhere(text,
+            fail_reason = im.add_text_anywhere(text,
                                            font,
                                            color=(0,0,0))
 #                                           color='random')
-            if not success:
+            if fail_reason == "no_more_space":
                 break
 
         return im

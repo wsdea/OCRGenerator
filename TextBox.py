@@ -58,8 +58,6 @@ class TextBox:
         while np.sum(np.abs(self.array[:, -1] - self.background)) < 1.:
             self.array = self.array[:, :-1]
 
-
-
     def add_to_image(self, img, x, y, borders = False):
         self.left = x
         self.right = x + self.shape[1] - 1 #included
@@ -73,7 +71,6 @@ class TextBox:
         img[self.up: self.down + 1, self.left: self.right + 1] = blended_box
 
         return img
-
 
     def add_borders_to_image(self, img):
         if np.sum(self.background) < 100: #not a lot of light

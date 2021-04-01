@@ -11,8 +11,7 @@ class PDFImage:
                  shape,
                  pipeline: Pipeline,
                  background=(255, 255, 255),
-                #  max_overlap=7,
-                 max_overlap=0,
+                 max_overlap=0.1,
                  min_color_difference=100,
                  ):
 
@@ -24,7 +23,10 @@ class PDFImage:
         self.shape = shape
         self.array = (self.background + np.zeros((shape[0], shape[1], 3))).astype(np.uint8)
         self.box_list = []
-        self.free_ys = [True] * self.shape[0]
+        # self.free_ys = [True] * self.shape[0]
+        self.taken_space = np.zeros(self.shape, dtype=bool)
+
+        assert 0 <= max_overlap <= 1
         self.max_overlap = max_overlap
 
     def choose_random_text_color(self):
@@ -45,28 +47,21 @@ class PDFImage:
         max_y = self.shape[0] - box.shape[0]
 
         if max_x < 0 or max_y < 0:
-            print('Text is too big')
-            return True
+            return 'too_big'
 
-        x = random.randint(0, max_x)
+        x = int(random.random() * max_x)
+        y = int(random.random() * max_y)
 
-        y_candidates = [y for y in np.where(self.free_ys)[0]
-                            if sum(self.free_ys[y:y + box.shape[0]]) >= box.shape[0] - self.max_overlap
-                            and y < max_y] #starting values
+        #checking availability
 
-        if len(y_candidates) == 0:
-            print('No more y space')
-            return False
+        if np.mean(self.taken_space[y:y + box.shape[0], x:x + box.shape[1]]) <= self.max_overlap:
+            self.array = box.add_to_image(self.array, x, y)
+            self.box_list.append(box)
+            self.taken_space[box.up: box.down, box.left: box.right] = True
+            return '' #no failing reasons
 
-        y = random.choice(y_candidates)
-
-        self.array = box.add_to_image(self.array, x, y)
-
-        self.box_list.append(box)
-
-        self.free_ys[box.up: box.down] = [False] * box.shape[0]
-
-        return True
+        else:
+            return "no_more_space"
 
     def save_img(self, show_borders=False, file_name="img.png"):
         if not file_name.endswith('.png'):
