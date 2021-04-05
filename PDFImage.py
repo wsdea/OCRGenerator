@@ -4,7 +4,7 @@ import random
 import cv2
 
 from TextBox import TextBox
-from Transformations import Pipeline
+from Transformations import Pipeline, FitToText
 
 class PDFImage:
     def __init__(self,
@@ -12,35 +12,45 @@ class PDFImage:
                  pipeline: Pipeline,
                  background=(255, 255, 255),
                  max_overlap=0.1,
-                 min_color_difference=100,
                  ):
 
-        if background == 'random':
+        if isinstance(background, str) and background == 'random':
             background = np.random.randint(0, 255, 3)
-        self.pipeline = pipeline
-        self.background = np.array(background, dtype=np.float32)
-        self.min_color_difference = min_color_difference
+        
+        if isinstance(background, tuple):
+            background = np.array(background)
+        
+        if isinstance(background, np.ndarray):
+            if background.shape == (3,):
+                self.background = background + np.zeros((shape[0], shape[1], 3), dtype=np.float32)
+            elif background.shape[:2] == shape and background.shape[2] == 3:
+                self.background = background
+            else:
+                print(background)
+                raise Exception('Unexpected background')
+        else:
+            print(background)
+            raise Exception('Unexpected background')
+            
+        self.pipeline = Pipeline([FitToText(), pipeline, FitToText()])
+
         self.shape = shape
-        self.array = (self.background + np.zeros((shape[0], shape[1], 3))).astype(np.uint8)
+        self.array = self.background.copy().astype(np.uint8)
         self.box_list = []
-        # self.free_ys = [True] * self.shape[0]
-        self.taken_space = np.zeros(self.shape, dtype=bool)
+        self.taken_space = np.zeros(self.shape, dtype=np.bool)
 
         assert 0 <= max_overlap <= 1
         self.max_overlap = max_overlap
 
     def choose_random_text_color(self):
-        color = np.random.randint(0, 255, 3)
-        while np.sqrt(np.sum((color - self.background) ** 2)) < self.min_color_difference:
-            color = np.random.randint(0, 255, 3)
-            print('too close {} vs {}'.format(self.background, color))
+        color = np.random.randint(0, 256, 3)
         return tuple(color)
 
     def add_text_anywhere(self, text, font, color=(0, 0, 0)):
         if color == 'random':
             color = self.choose_random_text_color()
 
-        box = TextBox(text, font, color, self.background)
+        box = TextBox(text, font, color)
         box = self.pipeline(box)
 
         max_x = self.shape[1] - box.shape[1]

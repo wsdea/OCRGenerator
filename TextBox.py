@@ -4,24 +4,27 @@ import numpy as np
 
 from PIL import Image, ImageFont, ImageDraw
 
+def BGRtoBGRA(array):
+    mins = array.min(axis=-1)
+    alphas = (255. - mins) / 255.
+    new_bgr = (array - mins[:, :, None]) / (alphas[:, :, None] + 1e-12)
+    alphas *= 255.
+    bgra = np.concatenate((new_bgr, alphas[:, :, None]), axis=-1)
+    return bgra.round().clip(0., 255.)
+
 class TextBox:
-    def __init__(self, text, font: ImageFont.FreeTypeFont, color, background_color):
+    def __init__(self, text, font: ImageFont.FreeTypeFont, color):
         self.text = text
-        self.background = np.array(background_color, dtype=np.float32)
-        if np.sum(np.abs(self.background - color)) == 0:
-            raise Exception('Text color is the same as background color')
+        self.background = np.array([255, 255, 255], dtype=np.uint8)
 
         text_size = font.getsize(text) #in pixel (width, height)
-        self.array = (self.background
-                      + np.zeros((text_size[1], text_size[0], 3))).astype(np.float32)
+        self.array = self.background + np.zeros((text_size[1], text_size[0], 3), dtype=np.uint8)
 
-        img = Image.fromarray(self.array.astype(np.uint8))
+        img = Image.fromarray(self.array)
         drawer = ImageDraw.Draw(img)
         drawer.text((0, 0), text, color, font=font)
 
-        self.array = np.array(img, dtype = np.float32)
-
-        self.fit_to_text() #here u, d, l, and r will be changed
+        self.array = np.array(img, dtype=np.float32)
 
     @property
     def shape(self):
@@ -41,48 +44,28 @@ class TextBox:
                                                   -1,
                                                   self.text)
 
-    def fit_to_text(self):
-        #upper crop
-        while np.sum(np.abs(self.array[0] - self.background)) < 1.:
-            self.array = self.array[1:]
-
-        #lower crop
-        while np.sum(np.abs(self.array[-1] - self.background)) < 1.:
-            self.array = self.array[:-1]
-
-        #left crop
-        while np.sum(np.abs(self.array[:, 0] - self.background)) < 1.:
-            self.array = self.array[:, 1:]
-
-        #right crop
-        while np.sum(np.abs(self.array[:, -1] - self.background)) < 1.:
-            self.array = self.array[:, :-1]
-
     def add_to_image(self, img, x, y, borders = False):
         self.left = x
         self.right = x + self.shape[1] - 1 #included
         self.up = y
         self.down  = y + self.shape[0] - 1 #included
 
-        mask = self.array != self.background
-        img_crop = img[self.up: self.down + 1, self.left: self.right + 1]
-        blended_box = np.where(mask, self.array.astype(np.uint8), img_crop)
-
+        text_array = BGRtoBGRA(self.array)
+        alpha = text_array[:, :, [3]] / 255.
+        text_array = text_array[:, :, :3]
+        
+        img_crop = img[self.up: self.down + 1, self.left: self.right + 1].astype(np.float32)
+        blended_box = img_crop * (1 - alpha) + text_array * alpha
+        blended_box = blended_box.clip(0, 255).round().astype(np.uint8)
+        
         img[self.up: self.down + 1, self.left: self.right + 1] = blended_box
 
         return img
-
+        
     def add_borders_to_image(self, img):
-        if np.sum(self.background) < 100: #not a lot of light
-            print('yolo')
-            img[self.up  , self.left: self.right + 1] += 100
-            img[self.down, self.left: self.right + 1] += 100
-            img[self.up: self.down + 1, self.left]  += 100
-            img[self.up: self.down + 1, self.right] += 100
-
-        else:
-            img[self.up  , self.left: self.right + 1] //= 2
-            img[self.down, self.left: self.right + 1] //= 2
-            img[self.up: self.down + 1, self.left]  //= 2
-            img[self.up: self.down + 1, self.right] //= 2
+        img[self.up  , self.left: self.right + 1] = 0
+        img[self.down, self.left: self.right + 1] = 0
+        img[self.up: self.down + 1, self.left]  = 0
+        img[self.up: self.down + 1, self.right] = 0
         return img
+    
